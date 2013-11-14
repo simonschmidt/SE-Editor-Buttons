@@ -139,14 +139,21 @@ EmbedCodeOnPage(function () {
     if (location.pathname.match(/^\/(?:questions\/(?:ask|\d+)|review\/(?:close|first-posts|late-answers|low-quality-posts|reopen|suggested-edits)\/\d+|posts\/\d+\/edit|users\/edit|edit-tag-wiki)/) === null)
         return;
 
-    // This UserScript depends on LiveQuery, so load it now and continue
-    // processing the page after this is complete
-    LoadDependentScript('https://jquery-utils.googlecode.com/svn-history/r307/trunk/src/jquery.livequery.js', function () {
+    // This UserScript depends on Mutation Summary, so load it now and
+    // start injecting buttons into all new editors
+    LoadDependentScript('http://mutation-summary.googlecode.com/git/src/mutation-summary.js', function() {
 
-        // For each button row, inject our buttons into the toolbar
-        $('.wmd-button-row').livequery(function () {
+        // Inject our buttons into the toolbar
+        function InjectButtons( button_row_dom ) {
 
-            var button_row = $(this);
+            // Only inject once
+            if (button_row_dom.hasAttribute('injected-buttons')){
+                return;
+            } else {
+                button_row_dom.setAttribute('injected-buttons', true);
+            }
+
+            var button_row = $(button_row_dom);
             var editor = button_row.parent().siblings('.wmd-input');
 
             // Asks the user the specified question and inserts the answer into the editor with the specified markdown
@@ -800,6 +807,22 @@ EmbedCodeOnPage(function () {
 
             AddToolbarButtons(button_row, buttons);
 
+        }
+
+        // Detect new editors and inject buttons
+        var observer = new MutationSummary({
+            queries: [{ element: '.wmd-button-row' }],
+            callback:
+              function (summaries) {
+                summaries[0].added.forEach( InjectButtons );
+              }
         });
+
+        // Ensure editors that exists before observer gets buttons too
+        var editors = document.getElementsByClassName('wmd-button-row');
+        for(var i = 0; i < editors.length;  i++ ){
+            InjectButtons(editors[i]);
+        }
+
     });
 });
